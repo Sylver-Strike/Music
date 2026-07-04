@@ -1,0 +1,29 @@
+{
+  "name": "sonicfetch",
+  "version": "1.0.0",
+  "description": "Free Music Downloader Web App",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "postinstall": "node install-yt-dlp.js",
+    "android:sync": "xcopy /E /I /Y public\\* android\\app\\src\\main\\assets\\www\\",
+    "android:build": "cd android && .\\gradlew assembleDebug"
+  },
+  "keywords": [
+    "downloader",
+    "music",
+    "mp3",
+    "audio"
+  ],
+  "author": "SonicFetch Team",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cheerio": "^1.0.0",
+    "express": "^4.21.2",
+    "ffmpeg-static": "^5.3.0",
+    "node-id3": "^0.2.6",
+    "uuid": "^11.0.3"
+  }
+}

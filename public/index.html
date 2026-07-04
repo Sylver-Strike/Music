@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SonicFetch - Free High-Quality Music Downloader</title>
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Download high-quality audio and music from YouTube, SoundCloud, and other platforms. Transcode instantly to 128kbps, 192kbps, or 320kbps MP3 for free.">
+  <meta name="keywords" content="music downloader, youtube to mp3, soundcloud downloader, convert to mp3, 320kbps mp3, free audio extractor">
+  <link rel="icon" type="image/png" href="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=32&auto=format&fit=crop">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Decorative background elements -->
+  <div class="bg-glow bg-glow-purple"></div>
+  <div class="bg-glow bg-glow-blue"></div>
+
+  <!-- App Shell: Sidebar + Main -->
+  <div class="app-shell" id="app-shell">
+
+    <!-- ===== LEFT SIDEBAR ===== -->
+    <aside class="sidebar glass-panel" id="sidebar">
+      <!-- Sidebar Header / Logo -->
+      <div class="sidebar-header">
+        <div class="logo-wrapper">
+          <div class="logo-icon-bg">
+            <i data-lucide="music-4" class="logo-icon animate-pulse"></i>
+          </div>
+          <h1 class="logo-text">Sonic<span>Fetch</span></h1>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="sidebar-nav">
+        <button class="nav-link active" id="nav-fetch" data-view="fetch">
+          <i data-lucide="download" class="nav-icon"></i>
+          <span>Fetch</span>
+        </button>
+        <button class="nav-link" id="nav-library" data-view="library">
+          <i data-lucide="library" class="nav-icon"></i>
+          <span>Library</span>
+          <span class="nav-badge hidden" id="library-badge">0</span>
+        </button>
+      </nav>
+
+      <!-- Mini Now-Playing (sidebar bottom) -->
+      <div class="sidebar-now-playing hidden" id="sidebar-now-playing">
+        <div class="mini-art" id="mini-art">
+          <img src="" alt="Now playing artwork" id="mini-art-img">
+        </div>
+        <div class="mini-info">
+          <span class="mini-title" id="mini-title">Not Playing</span>
+          <span class="mini-source" id="mini-source">—</span>
+        </div>
+        <button class="mini-play-btn" id="mini-play-btn" title="Play/Pause">
+          <i data-lucide="play" class="mini-play-icon"></i>
+        </button>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <p>&copy; 2026 SonicFetch</p>
+      </div>
+    </aside>
+
+    <!-- Mobile Hamburger Toggle -->
+    <button class="hamburger-btn" id="hamburger-btn" title="Toggle sidebar">
+      <i data-lucide="menu"></i>
+    </button>
+    <!-- Mobile overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- ===== MAIN CONTENT AREA ===== -->
+    <div class="main-area" id="main-area">
+
+      <!-- ===== VIEW: FETCH (existing downloader) ===== -->
+      <div class="view-panel active" id="view-fetch">
+        <!-- Header/Logo Area (main content header) -->
+        <header class="app-header">
+          <p class="subtitle">Extract and download clean, high-quality audio files from online platforms instantly.</p>
+        </header>
+
+        <!-- Main Card Container -->
+        <main class="main-card glass-panel" id="main-card">
+          
+          <!-- STATE 1: HOME (URL INPUT) -->
+          <section id="state-home" class="card-state active">
+            <h2 class="section-title">Paste Media Link</h2>
+            <p class="section-desc">Paste the link of the video or audio file you want to download. Supports YouTube, SoundCloud, Bandcamp, and more.</p>
+            
+            <form id="fetch-form" class="input-form">
+              <div class="input-wrapper">
+                <i data-lucide="link" class="input-icon"></i>
+                <input 
+                  type="url" 
+                  id="url-input" 
+                  placeholder="Paste your audio or video link here..." 
+                  required 
+                  autocomplete="off"
+                  spellcheck="false"
+                >
+                <button type="button" id="clear-btn" class="clear-btn hidden" title="Clear input">
+                  <i data-lucide="x"></i>
+                </button>
+              </div>
+              <button type="submit" id="fetch-btn" class="primary-btn" disabled>
+                <span>Fetch Link</span>
+                <i data-lucide="arrow-right" class="btn-icon"></i>
+              </button>
+            </form>
+
+            <!-- Error Alert Container -->
+            <div id="home-error" class="alert-box error-alert hidden">
+              <i data-lucide="alert-circle" class="alert-icon"></i>
+              <span class="alert-message"></span>
+            </div>
+
+            <!-- Supported platforms info -->
+            <div class="supported-platforms">
+              <span class="platforms-label">Supported platforms:</span>
+              <div class="platforms-list">
+                <span class="platform-tag"><i data-lucide="youtube" class="platform-icon"></i> YouTube</span>
+                <span class="platform-tag"><i data-lucide="music" class="platform-icon"></i> SoundCloud</span>
+                <span class="platform-tag"><i data-lucide="disc" class="platform-icon"></i> Bandcamp</span>
+                <span class="platform-tag"><i data-lucide="video" class="platform-icon"></i> Vimeo</span>
+                <span class="platform-tag"><i data-lucide="globe" class="platform-icon"></i> Web Links</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- STATE 2: METADATA PROCESSING / PARSING -->
+          <section id="state-processing" class="card-state">
+            <div class="spinner-container">
+              <div class="double-bounce-spinner">
+                <div class="double-bounce1"></div>
+                <div class="double-bounce2"></div>
+              </div>
+            </div>
+            <h2 class="processing-title">Fetching Metadata</h2>
+            <p class="processing-status" id="processing-status-text">Connecting to the target server...</p>
+            <div class="sub-loader-bar">
+              <div class="sub-loader-progress"></div>
+            </div>
+          </section>
+
+          <!-- STATE 3: OPTIONS & QUALITY SELECT -->
+          <section id="state-options" class="card-state">
+            <h2 class="section-title">Configure Download</h2>
+            
+            <!-- Track Preview Metadata Card -->
+            <div class="track-preview-card glass-panel-inner">
+              <div class="thumbnail-wrapper">
+                <img id="preview-thumbnail" src="" alt="Video thumbnail">
+                <span class="track-duration" id="preview-duration">0:00</span>
+              </div>
+              <div class="track-info">
+                <h3 class="track-title" id="preview-title">Track Title</h3>
+                <div class="track-meta">
+                  <span class="track-source" id="preview-source">
+                    <i data-lucide="globe" class="source-icon"></i>
+                    <span>Source Platform</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Format selection: Audio vs Video -->
+            <div class="config-section">
+              <label class="config-label">Download Format</label>
+              <div class="format-toggle-grid">
+                <label class="format-card active" id="format-card-audio">
+                  <input type="radio" name="download-format" value="audio" checked>
+                  <div class="format-card-content">
+                    <div class="format-card-icon-wrap">
+                      <i data-lucide="music" class="format-card-icon"></i>
+                    </div>
+                    <div class="format-card-info">
+                      <span class="format-card-title">Audio <span class="format-ext">MP3</span></span>
+                      <span class="format-card-desc">Extract audio only, choose bitrate quality</span>
+                    </div>
+                  </div>
+                </label>
+                <label class="format-card" id="format-card-video">
+                  <input type="radio" name="download-format" value="video">
+                  <div class="format-card-content">
+                    <div class="format-card-icon-wrap">
+                      <i data-lucide="film" class="format-card-icon"></i>
+                    </div>
+                    <div class="format-card-info">
+                      <span class="format-card-title">Video <span class="format-ext">MP4</span></span>
+                      <span class="format-card-desc">Download full video with audio, best quality</span>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Quality selection forms (audio only) -->
+            <div class="config-section" id="audio-quality-section">
+              <label class="config-label">Select Audio Quality</label>
+              <div class="quality-grid">
+                <label class="quality-card active">
+                  <input type="radio" name="audio-quality" value="320kbps" checked>
+                  <div class="quality-card-content">
+                    <div class="quality-header">
+                      <span class="quality-badge badge-ultra">Ultra</span>
+                      <span class="bitrate">320 kbps</span>
+                    </div>
+                    <p class="quality-desc">Highest audio fidelity, standard file size. Best for high-end audio setups.</p>
+                  </div>
+                </label>
+
+                <label class="quality-card">
+                  <input type="radio" name="audio-quality" value="192kbps">
+                  <div class="quality-card-content">
+                    <div class="quality-header">
+                      <span class="quality-badge badge-high">High</span>
+                      <span class="bitrate">192 kbps</span>
+                    </div>
+                    <p class="quality-desc">Balanced audio quality and file size. Recommended for daily mobile listening.</p>
+                  </div>
+                </label>
+
+                <label class="quality-card">
+                  <input type="radio" name="audio-quality" value="128kbps">
+                  <div class="quality-card-content">
+                    <div class="quality-header">
+                      <span class="quality-badge badge-standard">Standard</span>
+                      <span class="bitrate">128 kbps</span>
+                    </div>
+                    <p class="quality-desc">Standard resolution. Ultra-fast downloads, optimal for data saving.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="actions-row">
+              <button id="back-to-input" class="secondary-btn">
+                <i data-lucide="arrow-left" class="btn-icon"></i>
+                <span>Back</span>
+              </button>
+              <button id="convert-btn" class="primary-btn pulse-glow">
+                <span>Extract Audio</span>
+                <i data-lucide="cpu" class="btn-icon"></i>
+              </button>
+            </div>
+          </section>
+
+          <!-- STATE 4: TRANSCODING PROGRESS & DOWNLOAD -->
+          <section id="state-download" class="card-state">
+            <div class="download-header">
+              <div class="process-icon-wrapper" id="download-icon-container">
+                <i data-lucide="cpu" class="process-icon animate-spin-slow"></i>
+              </div>
+              <h2 class="download-state-title" id="download-state-title">Converting Audio</h2>
+              <p class="download-state-desc" id="download-state-desc">Transcoding media stream to selected format...</p>
+            </div>
+
+            <!-- Progress Tracker Bar -->
+            <div class="progress-box">
+              <div class="progress-info">
+                <span class="progress-step" id="progress-step-text">Initializing task...</span>
+                <span class="progress-percentage" id="progress-percentage-text">0%</span>
+              </div>
+              <div class="progress-track">
+                <div class="progress-fill" id="progress-fill-bar" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- Completion Track Details (Hidden during conversion) -->
+            <div class="track-details-ready glass-panel-inner hidden" id="track-details-ready">
+              <i data-lucide="check-circle-2" class="success-check-icon"></i>
+              <div class="ready-details">
+                <h4 class="ready-title" id="ready-track-title">Your file is ready!</h4>
+                <p class="ready-desc" id="ready-track-desc">192kbps MP3 • 3.2 MB</p>
+              </div>
+            </div>
+
+            <div class="actions-row justify-center">
+              <button id="cancel-convert-btn" class="secondary-btn">
+                <span>Cancel</span>
+              </button>
+              <button id="start-download-btn" class="primary-btn success-btn hidden">
+                <span>Download Now</span>
+                <i data-lucide="download" class="btn-icon"></i>
+              </button>
+              <button id="convert-another-btn" class="secondary-btn hidden">
+                <i data-lucide="rotate-ccw" class="btn-icon"></i>
+                <span>Convert Another</span>
+              </button>
+            </div>
+          </section>
+
+        </main>
+
+        <!-- Footer Area -->
+        <footer class="app-footer">
+          <p>&copy; 2026 SonicFetch. Built with modern, clean code. For creative commons and royalty-free downloads only.</p>
+        </footer>
+      </div>
+
+      <!-- ===== VIEW: LIBRARY ===== -->
+      <div class="view-panel" id="view-library">
+        <header class="library-header">
+          <div class="library-header-left">
+            <h2 class="library-title">My Library</h2>
+            <div class="library-stats">
+              <span class="library-stat" id="library-track-count">0 tracks</span>
+              <span class="library-stat-divider">•</span>
+              <span class="library-stat" id="library-storage-used">0 MB used</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- Empty State -->
+        <div class="library-empty" id="library-empty">
+          <div class="library-empty-icon-wrap">
+            <i data-lucide="music-2" class="library-empty-icon"></i>
+          </div>
+          <h3 class="library-empty-title">Your library is empty</h3>
+          <p class="library-empty-desc">Download some music and it will automatically appear here for offline playback.</p>
+          <button class="primary-btn" id="library-go-fetch">
+            <span>Start Downloading</span>
+            <i data-lucide="arrow-right" class="btn-icon"></i>
+          </button>
+        </div>
+
+        <!-- Track List -->
+        <div class="library-track-list" id="library-track-list">
+          <!-- Tracks are rendered dynamically by JS -->
+        </div>
+      </div>
+
+    </div><!-- /main-area -->
+
+    <!-- ===== BOTTOM AUDIO PLAYER BAR ===== -->
+    <div class="audio-player-bar hidden" id="audio-player-bar">
+      <div class="player-seek-track" id="player-seek-track">
+        <div class="player-seek-fill" id="player-seek-fill"></div>
+        <input type="range" class="player-seek-input" id="player-seek-input" min="0" max="100" value="0" step="0.1">
+      </div>
+      <div class="player-content">
+        <div class="player-track-info">
+          <div class="player-art" id="player-art">
+            <img src="" alt="Playing" id="player-art-img">
+          </div>
+          <div class="player-meta">
+            <span class="player-title" id="player-title">Track Title</span>
+            <span class="player-source" id="player-source">Source</span>
+          </div>
+        </div>
+        <div class="player-controls">
+          <button class="player-ctrl-btn" id="player-prev" title="Previous">
+            <i data-lucide="skip-back"></i>
+          </button>
+          <button class="player-ctrl-btn player-play-btn" id="player-play" title="Play/Pause">
+            <i data-lucide="play" class="player-play-icon"></i>
+          </button>
+          <button class="player-ctrl-btn" id="player-next" title="Next">
+            <i data-lucide="skip-forward"></i>
+          </button>
+        </div>
+        <div class="player-right">
+          <span class="player-time" id="player-time-current">0:00</span>
+          <span class="player-time-sep">/</span>
+          <span class="player-time" id="player-time-total">0:00</span>
+          <div class="player-volume-wrap">
+            <button class="player-ctrl-btn" id="player-volume-btn" title="Volume">
+              <i data-lucide="volume-2" class="player-volume-icon"></i>
+            </button>
+            <input type="range" class="player-volume-slider" id="player-volume-slider" min="0" max="100" value="80">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden HTML5 Audio Element -->
+    <audio id="audio-element" preload="auto"></audio>
+
+  </div><!-- /app-shell -->
+
+  <!-- Main JavaScript File -->
+  <script src="js/app.js"></script>
+</body>
+</html>
