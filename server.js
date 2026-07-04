@@ -741,13 +741,14 @@ async function processJob(job) {
   }
 
   // Build yt-dlp arguments
+  // android client works without a JS runtime (deno), unlike tv_downgraded
   const ytArgs = isVideo
     ? [
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=tv_downgraded,web',
-        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        '--extractor-args', 'youtube:player_client=android',
+        '-f', 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
         '--merge-output-format', 'mp4',
         '-o', outputPath,
         '--newline',           // One progress line per output (parseable)
@@ -758,7 +759,7 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=tv_downgraded,web',
+        '--extractor-args', 'youtube:player_client=android',
         '-x',                            // Extract audio only
         '--audio-format', 'mp3',
         '--audio-quality', bitrate + 'K',
