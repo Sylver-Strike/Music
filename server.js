@@ -36,18 +36,49 @@ app.use((req, res, next) => {
 // Directories
 const PUBLIC_DIR = process.env.PUBLIC_DIR || path.join(__dirname, 'public');
 const CACHE_DIR = process.env.CACHE_DIR || path.join(__dirname, 'temp_cache');
-const LIBRARY_DIR = process.env.LIBRARY_DIR || path.join(__dirname, 'library');
-const LIBRARY_DB = process.env.LIBRARY_DB || path.join(__dirname, 'library.json');
+let LIBRARY_DIR = process.env.LIBRARY_DIR || path.join(__dirname, 'library');
+let LIBRARY_DB = process.env.LIBRARY_DB || path.join(__dirname, 'library.json');
 
 // Ensure directories exist
-if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR, { recursive: true });
-if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
-if (!fs.existsSync(LIBRARY_DIR)) fs.mkdirSync(LIBRARY_DIR, { recursive: true });
-if (!fs.existsSync(path.join(PUBLIC_DIR, 'css'))) fs.mkdirSync(path.join(PUBLIC_DIR, 'css'), { recursive: true });
-if (!fs.existsSync(path.join(PUBLIC_DIR, 'js'))) fs.mkdirSync(path.join(PUBLIC_DIR, 'js'), { recursive: true });
+try {
+  if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+  if (!fs.existsSync(path.join(PUBLIC_DIR, 'css'))) fs.mkdirSync(path.join(PUBLIC_DIR, 'css'), { recursive: true });
+  if (!fs.existsSync(path.join(PUBLIC_DIR, 'js'))) fs.mkdirSync(path.join(PUBLIC_DIR, 'js'), { recursive: true });
+} catch (err) {
+  console.error(`[Warning] Failed to create directories in PUBLIC_DIR: ${err.message}`);
+}
+
+try {
+  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+} catch (err) {
+  console.error(`[Warning] Failed to create CACHE_DIR: ${err.message}`);
+}
+
+try {
+  if (!fs.existsSync(LIBRARY_DIR)) fs.mkdirSync(LIBRARY_DIR, { recursive: true });
+} catch (err) {
+  console.error(`[Warning] Failed to create LIBRARY_DIR at ${LIBRARY_DIR}: ${err.message}. Falling back to local library folder.`);
+  LIBRARY_DIR = path.join(__dirname, 'library');
+  LIBRARY_DB = path.join(__dirname, 'library.json');
+  try {
+    if (!fs.existsSync(LIBRARY_DIR)) fs.mkdirSync(LIBRARY_DIR, { recursive: true });
+  } catch (innerErr) {
+    console.error(`[FATAL] Could not create fallback LIBRARY_DIR: ${innerErr.message}`);
+  }
+}
 
 // Initialize library.json if missing
-if (!fs.existsSync(LIBRARY_DB)) fs.writeFileSync(LIBRARY_DB, '[]', 'utf-8');
+try {
+  if (!fs.existsSync(LIBRARY_DB)) fs.writeFileSync(LIBRARY_DB, '[]', 'utf-8');
+} catch (err) {
+  console.error(`[Warning] Failed to initialize LIBRARY_DB at ${LIBRARY_DB}: ${err.message}. Falling back to local library database.`);
+  LIBRARY_DB = path.join(__dirname, 'library.json');
+  try {
+    if (!fs.existsSync(LIBRARY_DB)) fs.writeFileSync(LIBRARY_DB, '[]', 'utf-8');
+  } catch (innerErr) {
+    console.error(`[FATAL] Could not initialize fallback LIBRARY_DB: ${innerErr.message}`);
+  }
+}
 
 app.use(express.json());
 app.use(express.static(PUBLIC_DIR));
