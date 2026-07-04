@@ -751,7 +751,7 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=ios',
+        '--extractor-args', 'youtube:player_client=mweb',
         '--user-agent', mobileUA,
         '-f', 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
         '--merge-output-format', 'mp4',
@@ -764,7 +764,7 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=ios',
+        '--extractor-args', 'youtube:player_client=mweb',
         '--user-agent', mobileUA,
         '-x',                            // Extract audio only
         '--audio-format', 'mp3',
