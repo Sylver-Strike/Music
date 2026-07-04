@@ -741,17 +741,19 @@ async function processJob(job) {
   }
 
   // Build yt-dlp arguments
-  // android client works without a JS runtime (deno), unlike tv_downgraded
+  // ios client + mobile user-agent is most reliable for bypassing bot checks on datacenter IPs
+  const mobileUA = 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)';
   const ytArgs = isVideo
     ? [
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=web_safari',
+        '--extractor-args', 'youtube:player_client=ios',
+        '--user-agent', mobileUA,
         '-f', 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
         '--merge-output-format', 'mp4',
         '-o', outputPath,
-        '--newline',           // One progress line per output (parseable)
+        '--newline',
         '--progress',
         job.url
       ]
@@ -759,7 +761,8 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=web_safari',
+        '--extractor-args', 'youtube:player_client=ios',
+        '--user-agent', mobileUA,
         '-x',                            // Extract audio only
         '--audio-format', 'mp3',
         '--audio-quality', bitrate + 'K',
