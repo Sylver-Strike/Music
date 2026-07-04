@@ -84,9 +84,12 @@ try {
 const COOKIES_FILE_PATH = path.join(__dirname, 'cookies.txt');
 if (process.env.YTDLP_COOKIES_B64) {
   try {
-    const decodedCookies = Buffer.from(process.env.YTDLP_COOKIES_B64, 'base64').toString('utf-8');
+    // Strip ALL whitespace before decoding — Render's UI injects hidden newlines
+    // that cause Buffer.from() to silently truncate the decoded output
+    const cleanB64 = process.env.YTDLP_COOKIES_B64.replace(/\s+/g, '');
+    const decodedCookies = Buffer.from(cleanB64, 'base64').toString('utf-8');
     fs.writeFileSync(COOKIES_FILE_PATH, decodedCookies, 'utf-8');
-    console.log('[Engine] Decoded and wrote YTDLP_COOKIES_B64 to cookies.txt');
+    console.log(`[Engine] Decoded cookies.txt — ${decodedCookies.length} chars written (b64 input: ${cleanB64.length} chars)`);
   } catch (err) {
     console.error(`[Engine] Failed to write decoded base64 cookies: ${err.message}`);
   }
