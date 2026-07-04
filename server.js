@@ -80,6 +80,18 @@ try {
   }
 }
 
+// Base64 Cookies decoding support (free workaround for Render)
+const COOKIES_FILE_PATH = path.join(__dirname, 'cookies.txt');
+if (process.env.YTDLP_COOKIES_B64) {
+  try {
+    const decodedCookies = Buffer.from(process.env.YTDLP_COOKIES_B64, 'base64').toString('utf-8');
+    fs.writeFileSync(COOKIES_FILE_PATH, decodedCookies, 'utf-8');
+    console.log('[Engine] Decoded and wrote YTDLP_COOKIES_B64 to cookies.txt');
+  } catch (err) {
+    console.error(`[Engine] Failed to write decoded base64 cookies: ${err.message}`);
+  }
+}
+
 app.use(express.json());
 app.use(express.static(PUBLIC_DIR));
 
