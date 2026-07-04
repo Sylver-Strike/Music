@@ -698,11 +698,22 @@ async function processJob(job) {
   const ext = isVideo ? 'mp4' : 'mp3';
   const outputPath = path.join(CACHE_DIR, `${job.id}.${ext}`);
 
+  // Cookies support — helps bypass YouTube bot detection on cloud servers
+  // Place a cookies.txt file in the project root, or set YTDLP_COOKIES env var
+  const cookiesPath = process.env.YTDLP_COOKIES || path.join(__dirname, 'cookies.txt');
+  const cookiesArgs = fs.existsSync(cookiesPath) ? ['--cookies', cookiesPath] : [];
+  if (cookiesArgs.length > 0) {
+    console.log(`[yt-dlp] Using cookies file: ${cookiesPath}`);
+  } else {
+    console.warn('[yt-dlp] No cookies.txt found. YouTube may block requests. Add a cookies.txt file to fix this.');
+  }
+
   // Build yt-dlp arguments
   const ytArgs = isVideo
     ? [
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
+        ...cookiesArgs,
         '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         '--merge-output-format', 'mp4',
         '-o', outputPath,
@@ -713,6 +724,7 @@ async function processJob(job) {
     : [
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
+        ...cookiesArgs,
         '-x',                            // Extract audio only
         '--audio-format', 'mp3',
         '--audio-quality', bitrate + 'K',
@@ -725,6 +737,7 @@ async function processJob(job) {
       ];
 
   console.log(`[yt-dlp] Command: ${YTDLP_PATH} ${ytArgs.join(' ')}`);
+
 
   await new Promise((resolve, reject) => {
     const proc = spawn(YTDLP_PATH, ytArgs, { windowsHide: true });
