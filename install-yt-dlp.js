@@ -15,14 +15,9 @@ async function install() {
   }
 
   const dest = path.join(binDir, 'yt-dlp');
-  if (fs.existsSync(dest)) {
-    console.log('yt-dlp Linux binary already exists at', dest);
-    try {
-      execSync(`chmod +x "${dest}"`);
-    } catch (e) {}
-    return;
-  }
 
+  // Always download fresh to ensure we have the latest version
+  // (avoids caching an outdated binary that YouTube blocks)
   const url = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
   console.log(`Downloading latest Linux yt-dlp binary from ${url}...`);
   try {
@@ -44,6 +39,13 @@ async function install() {
     // Make it executable
     execSync(`chmod +x "${dest}"`);
     console.log('Set executable permissions on yt-dlp binary.');
+
+    // Print the version so we can verify in Render logs
+    try {
+      const version = execSync(`"${dest}" --version`).toString().trim();
+      console.log(`[yt-dlp] Installed version: ${version}`);
+    } catch (e) {}
+
   } catch (err) {
     console.error('Failed to download yt-dlp Linux binary:', err.message);
     console.log('Fallback: Will try to use global system "yt-dlp" command instead.');

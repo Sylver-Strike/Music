@@ -747,7 +747,7 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=android',
+        '--extractor-args', 'youtube:player_client=mweb,web',
         '-f', 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
         '--merge-output-format', 'mp4',
         '-o', outputPath,
@@ -759,7 +759,7 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=android',
+        '--extractor-args', 'youtube:player_client=mweb,web',
         '-x',                            // Extract audio only
         '--audio-format', 'mp3',
         '--audio-quality', bitrate + 'K',
