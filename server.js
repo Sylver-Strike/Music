@@ -545,6 +545,26 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', jobsActive: jobs.size, queueLength: jobQueue.length });
 });
 
+// Debug cookies endpoint
+app.get('/api/debug-cookies', (req, res) => {
+  const cookiesPath = process.env.YTDLP_COOKIES || path.join(__dirname, 'cookies.txt');
+  const exists = fs.existsSync(cookiesPath);
+  let size = 0;
+  if (exists) {
+    size = fs.statSync(cookiesPath).size;
+  }
+  res.json({
+    envVarExists: !!process.env.YTDLP_COOKIES_B64,
+    envVarLength: process.env.YTDLP_COOKIES_B64 ? process.env.YTDLP_COOKIES_B64.length : 0,
+    cookiesFileExists: exists,
+    cookiesFilePath: cookiesPath,
+    cookiesFileSize: size,
+    nodeVersion: process.version,
+    platform: process.platform
+  });
+});
+
+
 // ----------------------------------------------------
 // LIBRARY API ENDPOINTS
 // ----------------------------------------------------
