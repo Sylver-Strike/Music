@@ -899,8 +899,13 @@ async function processJob(job) {
         '--js-runtimes', `node:${process.execPath}`,
         '--no-check-certificates',
         '--retries', '3',
-        '-f', 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
+        // Prefer mp4 video + m4a audio (AAC) — both natively compatible with MP4 container.
+        // Fallback to best available combo if m4a isn't offered.
+        // This prevents the silent-video bug caused by Opus/WebM audio not muxing into MP4.
+        '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
         '--merge-output-format', 'mp4',
+        // Force-encode audio to AAC and copy video stream — guarantees audio works in all players
+        '--postprocessor-args', 'ffmpeg:-c:v copy -c:a aac -b:a 192k',
         '-o', outputPath,
         '--newline',
         '--progress',
