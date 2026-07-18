@@ -3,12 +3,7 @@ const path = require('path');
 const axios = require('axios');
 const { execSync } = require('child_process');
 
-async function install() {
-  if (process.platform === 'win32') {
-    console.log('Windows detected. Skipping Linux yt-dlp binary download.');
-    return;
-  }
-
+async function installYtDlp() {
   const binDir = path.join(__dirname, 'bin');
   if (!fs.existsSync(binDir)) {
     fs.mkdirSync(binDir, { recursive: true });
@@ -53,6 +48,36 @@ async function install() {
     console.error('Failed to download yt-dlp Linux binary:', err.message);
     console.log('Fallback: Will try to use global system "yt-dlp" command instead.');
   }
+}
+
+function installFfmpeg() {
+  // Check if ffmpeg is already available
+  try {
+    const ver = execSync('ffmpeg -version', { stdio: ['pipe', 'pipe', 'pipe'] }).toString().split('\n')[0].trim();
+    console.log(`[ffmpeg] Already available: ${ver}`);
+    return;
+  } catch (e) {
+    console.log('[ffmpeg] Not found in PATH. Attempting to install via apt-get...');
+  }
+
+  // Try apt-get install (works on Railway, Render Debian containers)
+  try {
+    execSync('apt-get update -qq && apt-get install -y -qq ffmpeg', { stdio: 'inherit' });
+    console.log('[ffmpeg] Installed via apt-get successfully.');
+  } catch (aptErr) {
+    console.warn(`[ffmpeg] apt-get install failed: ${aptErr.message}`);
+    console.warn('[ffmpeg] FFmpeg is not available. Audio extraction will fail. Make sure your deployment platform provides ffmpeg.');
+  }
+}
+
+async function install() {
+  if (process.platform === 'win32') {
+    console.log('Windows detected. Skipping Linux binary downloads.');
+    return;
+  }
+
+  await installYtDlp();
+  installFfmpeg();
 }
 
 install();
