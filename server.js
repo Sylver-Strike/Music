@@ -563,54 +563,28 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', jobsActive: jobs.size, queueLength: jobQueue.length });
 });
 
-// Debug cookies endpoint
+// Debug / health detail endpoint
 app.get('/api/debug-cookies', (req, res) => {
   const cookiesPath = process.env.YTDLP_COOKIES || path.join(__dirname, 'cookies.txt');
   const exists = fs.existsSync(cookiesPath);
-  let size = 0;
-  if (exists) {
-    size = fs.statSync(cookiesPath).size;
-  }
-  
-  let diagnostics = {};
-  try {
-    const { execSync } = require('child_process');
-    diagnostics.ytdlpPath = YTDLP_PATH;
-    diagnostics.localExists = fs.existsSync(path.join(__dirname, 'bin', 'yt-dlp'));
-    try {
-      diagnostics.localYtdlpVersion = execSync(`"${YTDLP_PATH}" --version`, { encoding: 'utf-8' }).trim();
-    } catch (e) { diagnostics.localYtdlpVersion = `Error: ${e.message} \nStdout: ${e.stdout} \nStderr: ${e.stderr}`; }
-    try {
-      diagnostics.whichYtdlp = execSync('which yt-dlp', { encoding: 'utf-8' }).trim();
-    } catch (e) { diagnostics.whichYtdlp = `Error: ${e.message}`; }
-    try {
-      diagnostics.globalYtdlpVersion = execSync('yt-dlp --version', { encoding: 'utf-8' }).trim();
-    } catch (e) { diagnostics.globalYtdlpVersion = `Error: ${e.message}`; }
-    try {
-      diagnostics.pythonVersion = execSync('python3 --version', { encoding: 'utf-8' }).trim();
-    } catch (e) { diagnostics.pythonVersion = `Error: ${e.message}`; }
-    try {
-      diagnostics.ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf-8' }).split('\n')[0].trim();
-    } catch (e) { diagnostics.ffmpegVersion = `Error: ${e.message}`; }
-    // Check ffmpeg-static bundled path
-    diagnostics.ffmpegStaticPath = ffmpegPath;
-    diagnostics.ffmpegStaticExists = fs.existsSync(ffmpegPath);
-    try {
-      diagnostics.ffmpegStaticVersion = execSync(`"${ffmpegPath}" -version`, { encoding: 'utf-8' }).split('\n')[0].trim();
-    } catch (e) { diagnostics.ffmpegStaticVersion = `Error: ${e.message}`; }
-  } catch (diagErr) {
-    diagnostics.error = diagErr.message;
-  }
+  const size = exists ? fs.statSync(cookiesPath).size : 0;
+
+  const { execSync } = require('child_process');
+  let ytdlpVersion = 'unknown';
+  let ffmpegStaticVersion = 'unknown';
+  try { ytdlpVersion = execSync(`"${YTDLP_PATH}" --version`, { encoding: 'utf-8' }).trim(); } catch (e) { ytdlpVersion = `Error: ${e.message}`; }
+  try { ffmpegStaticVersion = execSync(`"${ffmpegPath}" -version`, { encoding: 'utf-8' }).split('\n')[0].trim(); } catch (e) { ffmpegStaticVersion = `Error: ${e.message}`; }
 
   res.json({
-    envVarExists: !!process.env.YTDLP_COOKIES_B64,
-    envVarLength: process.env.YTDLP_COOKIES_B64 ? process.env.YTDLP_COOKIES_B64.length : 0,
-    cookiesFileExists: exists,
-    cookiesFilePath: cookiesPath,
-    cookiesFileSize: size,
-    nodeVersion: process.version,
     platform: process.platform,
-    diagnostics
+    nodeVersion: process.version,
+    ytdlpPath: YTDLP_PATH,
+    ytdlpVersion,
+    ffmpegStaticPath: ffmpegPath,
+    ffmpegStaticVersion,
+    cookiesFileExists: exists,
+    cookiesFileSize: size,
+    envVarExists: !!process.env.YTDLP_COOKIES_B64
   });
 });
 
