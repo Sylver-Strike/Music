@@ -592,6 +592,12 @@ app.get('/api/debug-cookies', (req, res) => {
     try {
       diagnostics.ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf-8' }).split('\n')[0].trim();
     } catch (e) { diagnostics.ffmpegVersion = `Error: ${e.message}`; }
+    // Check ffmpeg-static bundled path
+    diagnostics.ffmpegStaticPath = ffmpegPath;
+    diagnostics.ffmpegStaticExists = fs.existsSync(ffmpegPath);
+    try {
+      diagnostics.ffmpegStaticVersion = execSync(`"${ffmpegPath}" -version`, { encoding: 'utf-8' }).split('\n')[0].trim();
+    } catch (e) { diagnostics.ffmpegStaticVersion = `Error: ${e.message}`; }
   } catch (diagErr) {
     diagnostics.error = diagErr.message;
   }
