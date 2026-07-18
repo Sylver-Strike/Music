@@ -10,7 +10,7 @@ const ffmpegPath = require('ffmpeg-static');
 
 // Paths to bundled binaries
 const isWin = process.platform === 'win32';
-const YTDLP_PATH = isWin
+let YTDLP_PATH = isWin
   ? path.join(__dirname, 'bin', 'yt-dlp.exe')
   : (fs.existsSync(path.join(__dirname, 'bin', 'yt-dlp'))
       ? path.join(__dirname, 'bin', 'yt-dlp')
@@ -111,7 +111,22 @@ if (isWin) {
     console.log(`[Engine] ffmpeg binary found: ${ffmpegPath}`);
   }
 } else {
-  console.log(`[Engine] Configured for Linux/Unix. Using yt-dlp: ${YTDLP_PATH}`);
+  // Test if local binary works, if not fall back to global
+  try {
+    const { execSync } = require('child_process');
+    execSync(`"${YTDLP_PATH}" --version`, { stdio: 'ignore' });
+    console.log(`[Engine] Configured for Linux/Unix. Using yt-dlp: ${YTDLP_PATH}`);
+  } catch (err) {
+    console.warn(`[Warning] Local yt-dlp at ${YTDLP_PATH} is not executable or failed: ${err.message}. Trying global 'yt-dlp'...`);
+    try {
+      const { execSync } = require('child_process');
+      execSync('yt-dlp --version', { stdio: 'ignore' });
+      YTDLP_PATH = 'yt-dlp';
+      console.log(`[Engine] Configured for Linux/Unix. Falling back to global yt-dlp: ${YTDLP_PATH}`);
+    } catch (globalErr) {
+      console.error(`[FATAL] Neither local nor global yt-dlp is working: ${globalErr.message}`);
+    }
+  }
   console.log(`[Engine] ffmpeg binary found: ${ffmpegPath}`);
 }
 
@@ -751,8 +766,9 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=tv',
+        '--extractor-args', 'youtube:player_client=default,-tv,web_safari,web_embedded',
         '--user-agent', mobileUA,
+        '--js-runtimes', `node:${process.execPath}`,
         '-f', 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
         '--merge-output-format', 'mp4',
         '-o', outputPath,
@@ -764,8 +780,9 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=tv',
+        '--extractor-args', 'youtube:player_client=default,-tv,web_safari,web_embedded',
         '--user-agent', mobileUA,
+        '--js-runtimes', `node:${process.execPath}`,
         '-x',                            // Extract audio only
         '--audio-format', 'mp3',
         '--audio-quality', bitrate + 'K',
