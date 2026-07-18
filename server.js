@@ -765,16 +765,18 @@ async function processJob(job) {
   }
 
   // Build yt-dlp arguments
-  // ios client + mobile user-agent is most reliable for bypassing bot checks on datacenter IPs
-  const mobileUA = 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)';
+  // web_embedded + web clients with explicit node path for JS n-challenge solving.
+  // This is the proven working combination. process.execPath gives the exact node
+  // binary path on both Windows (node.exe) and Linux (/usr/bin/node etc.)
   const ytArgs = isVideo
     ? [
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=default,-tv,web_safari,web_embedded',
-        '--user-agent', mobileUA,
+        '--extractor-args', 'youtube:player_client=web_embedded,web',
         '--js-runtimes', `node:${process.execPath}`,
+        '--no-check-certificates',
+        '--retries', '3',
         '-f', 'bestvideo[ext=mp4]+bestaudio/bestvideo+bestaudio/best',
         '--merge-output-format', 'mp4',
         '-o', outputPath,
@@ -786,9 +788,10 @@ async function processJob(job) {
         '--no-playlist',
         '--ffmpeg-location', ffmpegPath,
         ...cookiesArgs,
-        '--extractor-args', 'youtube:player_client=default,-tv,web_safari,web_embedded',
-        '--user-agent', mobileUA,
+        '--extractor-args', 'youtube:player_client=web_embedded,web',
         '--js-runtimes', `node:${process.execPath}`,
+        '--no-check-certificates',
+        '--retries', '3',
         '-x',                            // Extract audio only
         '--audio-format', 'mp3',
         '--audio-quality', bitrate + 'K',
