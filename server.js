@@ -571,6 +571,28 @@ app.get('/api/debug-cookies', (req, res) => {
   if (exists) {
     size = fs.statSync(cookiesPath).size;
   }
+  
+  let diagnostics = {};
+  try {
+    const { execSync } = require('child_process');
+    diagnostics.ytdlpPath = YTDLP_PATH;
+    diagnostics.localExists = fs.existsSync(path.join(__dirname, 'bin', 'yt-dlp'));
+    try {
+      diagnostics.whichYtdlp = execSync('which yt-dlp', { encoding: 'utf-8' }).trim();
+    } catch (e) { diagnostics.whichYtdlp = `Error: ${e.message}`; }
+    try {
+      diagnostics.globalYtdlpVersion = execSync('yt-dlp --version', { encoding: 'utf-8' }).trim();
+    } catch (e) { diagnostics.globalYtdlpVersion = `Error: ${e.message}`; }
+    try {
+      diagnostics.pythonVersion = execSync('python3 --version', { encoding: 'utf-8' }).trim();
+    } catch (e) { diagnostics.pythonVersion = `Error: ${e.message}`; }
+    try {
+      diagnostics.ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf-8' }).split('\n')[0].trim();
+    } catch (e) { diagnostics.ffmpegVersion = `Error: ${e.message}`; }
+  } catch (diagErr) {
+    diagnostics.error = diagErr.message;
+  }
+
   res.json({
     envVarExists: !!process.env.YTDLP_COOKIES_B64,
     envVarLength: process.env.YTDLP_COOKIES_B64 ? process.env.YTDLP_COOKIES_B64.length : 0,
@@ -578,7 +600,8 @@ app.get('/api/debug-cookies', (req, res) => {
     cookiesFilePath: cookiesPath,
     cookiesFileSize: size,
     nodeVersion: process.version,
-    platform: process.platform
+    platform: process.platform,
+    diagnostics
   });
 });
 
