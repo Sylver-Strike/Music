@@ -578,6 +578,9 @@ app.get('/api/debug-cookies', (req, res) => {
     diagnostics.ytdlpPath = YTDLP_PATH;
     diagnostics.localExists = fs.existsSync(path.join(__dirname, 'bin', 'yt-dlp'));
     try {
+      diagnostics.localYtdlpVersion = execSync(`"${YTDLP_PATH}" --version`, { encoding: 'utf-8' }).trim();
+    } catch (e) { diagnostics.localYtdlpVersion = `Error: ${e.message} \nStdout: ${e.stdout} \nStderr: ${e.stderr}`; }
+    try {
       diagnostics.whichYtdlp = execSync('which yt-dlp', { encoding: 'utf-8' }).trim();
     } catch (e) { diagnostics.whichYtdlp = `Error: ${e.message}`; }
     try {
