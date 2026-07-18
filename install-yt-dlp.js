@@ -18,8 +18,9 @@ async function install() {
 
   // Always download fresh to ensure we have the latest version
   // (avoids caching an outdated binary that YouTube blocks)
-  const url = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp';
-  console.log(`Downloading latest Linux yt-dlp binary from ${url}...`);
+  // NOTE: Use yt-dlp_linux (standalone PyInstaller binary) — NOT plain 'yt-dlp' which is a Python script requiring python3
+  const url = 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux';
+  console.log(`Downloading latest Linux yt-dlp standalone binary from ${url}...`);
   try {
     const response = await axios({
       method: 'get',
@@ -40,11 +41,13 @@ async function install() {
     execSync(`chmod +x "${dest}"`);
     console.log('Set executable permissions on yt-dlp binary.');
 
-    // Print the version so we can verify in Render logs
+    // Print the version so we can verify in Railway / Render logs
     try {
-      const version = execSync(`"${dest}" --version`).toString().trim();
+      const version = execSync(`"${dest}" --version`, { stdio: ['pipe', 'pipe', 'pipe'] }).toString().trim();
       console.log(`[yt-dlp] Installed version: ${version}`);
-    } catch (e) {}
+    } catch (e) {
+      console.warn(`[yt-dlp] Warning: version check failed: ${e.message}`);
+    }
 
   } catch (err) {
     console.error('Failed to download yt-dlp Linux binary:', err.message);
