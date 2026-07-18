@@ -1,7 +1,7 @@
 /* ==========================================================================
    SonicFetch JavaScript controller
    Manages SPA transitions, URL validations, API communications, polling,
-   Library management, Audio Player, and View Routing.
+   Library management, Audio Player, View Routing, and User Authentication.
    ========================================================================== */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,6 +16,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const navFetchBtn = document.getElementById('nav-fetch');
   const navLibraryBtn = document.getElementById('nav-library');
   const libraryBadge = document.getElementById('library-badge');
+
+  // Sidebar user info
+  const sidebarUserAvatar = document.getElementById('sidebar-user-avatar');
+  const sidebarUsername = document.getElementById('sidebar-username');
+  const sidebarLogoutBtn = document.getElementById('sidebar-logout-btn');
+
+  // Auth Modal
+  const authModalOverlay = document.getElementById('auth-modal-overlay');
+  const tabLogin = document.getElementById('tab-login');
+  const tabRegister = document.getElementById('tab-register');
+  const authFormLogin = document.getElementById('auth-form-login');
+  const authFormRegister = document.getElementById('auth-form-register');
+  const loginUsername = document.getElementById('login-username');
+  const loginPassword = document.getElementById('login-password');
+  const loginError = document.getElementById('login-error');
+  const loginErrorMsg = document.getElementById('login-error-msg');
+  const loginSubmitBtn = document.getElementById('login-submit-btn');
+  const registerUsername = document.getElementById('register-username');
+  const registerPassword = document.getElementById('register-password');
+  const registerConfirm = document.getElementById('register-confirm');
+  const registerError = document.getElementById('register-error');
+  const registerErrorMsg = document.getElementById('register-error-msg');
+  const registerSubmitBtn = document.getElementById('register-submit-btn');
 
   // Views
   const viewFetch = document.getElementById('view-fetch');
@@ -99,6 +122,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let pollInterval = null;
   let processingTextInterval = null;
 
+  // Auth state
+  let authToken = localStorage.getItem('sonicfetch_token') || null;
+  let currentUser = null;
+
   // Library state
   let libraryTracks = [];
   let currentPlayingId = null;
@@ -107,6 +134,210 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize Lucide Icons
   lucide.createIcons();
+
+  // ==========================================================================
+  // AUTH HELPERS
+  // ==========================================================================
+  function getAuthHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
+    };
+  }
+
+  function saveToken(token) {
+    authToken = token;
+    localStorage.setItem('sonicfetch_token', token);
+  }
+
+  function clearToken() {
+    authToken = null;
+    currentUser = null;
+    localStorage.removeItem('sonicfetch_token');
+  }
+
+  function showAuthModal() {
+    authModalOverlay.classList.add('visible');
+    lucide.createIcons();
+  }
+
+  function hideAuthModal() {
+    authModalOverlay.classList.remove('visible');
+  }
+
+  function updateSidebarUser(username) {
+    currentUser = username;
+    sidebarUsername.textContent = username;
+    // Use first letter as avatar
+    sidebarUserAvatar.textContent = username.charAt(0).toUpperCase();
+  }
+
+  // ==========================================================================
+  // AUTH INITIALIZATION
+  // ==========================================================================
+  async function initAuth() {
+    if (!authToken) {
+      showAuthModal();
+      return;
+    }
+
+    // Verify token is still valid
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        updateSidebarUser(data.username);
+        hideAuthModal();
+        loadLibrary();
+      } else {
+        clearToken();
+        showAuthModal();
+      }
+    } catch (e) {
+      clearToken();
+      showAuthModal();
+    }
+  }
+
+  // ==========================================================================
+  // AUTH MODAL — TAB SWITCHING
+  // ==========================================================================
+  document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const selected = tab.dataset.tab;
+      if (selected === 'login') {
+        authFormLogin.classList.remove('hidden');
+        authFormRegister.classList.add('hidden');
+      } else {
+        authFormLogin.classList.add('hidden');
+        authFormRegister.classList.remove('hidden');
+      }
+
+      // Clear errors
+      loginError.classList.add('hidden');
+      registerError.classList.add('hidden');
+    });
+  });
+
+  // ==========================================================================
+  // AUTH MODAL — LOGIN
+  // ==========================================================================
+  authFormLogin.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    loginError.classList.add('hidden');
+    loginSubmitBtn.disabled = true;
+    loginSubmitBtn.querySelector('span').textContent = 'Signing in...';
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: loginUsername.value.trim(),
+          password: loginPassword.value
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login failed.');
+
+      saveToken(data.token);
+      updateSidebarUser(data.username);
+      loginPassword.value = '';
+      hideAuthModal();
+      loadLibrary();
+    } catch (err) {
+      loginErrorMsg.textContent = err.message;
+      loginError.classList.remove('hidden');
+      lucide.createIcons();
+    } finally {
+      loginSubmitBtn.disabled = false;
+      loginSubmitBtn.querySelector('span').textContent = 'Sign In';
+    }
+  });
+
+  // ==========================================================================
+  // AUTH MODAL — REGISTER
+  // ==========================================================================
+  authFormRegister.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    registerError.classList.add('hidden');
+
+    const username = registerUsername.value.trim();
+    const password = registerPassword.value;
+    const confirm = registerConfirm.value;
+
+    if (password !== confirm) {
+      registerErrorMsg.textContent = 'Passwords do not match.';
+      registerError.classList.remove('hidden');
+      lucide.createIcons();
+      return;
+    }
+
+    registerSubmitBtn.disabled = true;
+    registerSubmitBtn.querySelector('span').textContent = 'Creating account...';
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Registration failed.');
+
+      saveToken(data.token);
+      updateSidebarUser(data.username);
+      registerPassword.value = '';
+      registerConfirm.value = '';
+      registerUsername.value = '';
+      hideAuthModal();
+      loadLibrary();
+    } catch (err) {
+      registerErrorMsg.textContent = err.message;
+      registerError.classList.remove('hidden');
+      lucide.createIcons();
+    } finally {
+      registerSubmitBtn.disabled = false;
+      registerSubmitBtn.querySelector('span').textContent = 'Create Account';
+    }
+  });
+
+  // ==========================================================================
+  // LOGOUT
+  // ==========================================================================
+  sidebarLogoutBtn.addEventListener('click', async () => {
+    if (!authToken) return;
+
+    // Stop playback
+    audioElement.pause();
+    audioElement.src = '';
+    currentPlayingId = null;
+    currentPlayingIndex = -1;
+    isPlaying = false;
+    hidePlayer();
+    libraryTracks = [];
+    updateLibraryBadge();
+
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      });
+    } catch (e) { /* ignore */ }
+
+    clearToken();
+    sidebarUsername.textContent = 'Not logged in';
+    sidebarUserAvatar.textContent = '?';
+
+    // Switch to fetch view and show modal
+    switchView('fetch');
+    showAuthModal();
+  });
 
   // ==========================================================================
   // VIEW ROUTER
@@ -282,6 +513,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
   convertBtn.addEventListener('click', async () => {
     if (!fetchedMetadata) return;
+
+    // Guard: must be logged in to convert
+    if (!authToken) { showAuthModal(); return; }
+
     const selectedFormat = document.querySelector('input[name="download-format"]:checked').value;
     const isVideo = selectedFormat === 'video';
     activeJobType = selectedFormat;
@@ -296,9 +531,11 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       if (!isVideo) body.quality = selectedQuality;
       const response = await fetch('/api/convert', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: getAuthHeaders(),
         body: JSON.stringify(body)
       });
+      if (response.status === 401) { showAuthModal(); return; }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to start conversion.');
       activeJobId = data.jobId;
@@ -420,8 +657,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // LIBRARY — DATA + RENDERING
   // ==========================================================================
   async function loadLibrary() {
+    if (!authToken) return; // Don't load if not logged in
     try {
-      const response = await fetch(`/api/library?t=${Date.now()}`);
+      const response = await fetch(`/api/library?t=${Date.now()}`, {
+        headers: getAuthHeaders()
+      });
+      if (response.status === 401) {
+        clearToken();
+        showAuthModal();
+        return;
+      }
       const data = await response.json();
       libraryTracks = data.tracks || [];
       updateLibraryBadge();
@@ -545,8 +790,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fallbackThumb = 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=100&auto=format&fit=crop';
 
-    // Set audio source and play
-    audioElement.src = `/api/library/${track.id}/stream`;
+    // Build authenticated stream URL by appending token as query param
+    // (audio element cannot set custom headers, so we use a signed query param approach)
+    const streamUrl = `/api/library/${track.id}/stream?token=${encodeURIComponent(authToken || '')}`;
+    audioElement.src = streamUrl;
     audioElement.play().then(() => {
       isPlaying = true;
       updatePlayerUI(track);
@@ -570,7 +817,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleExportTrack(id) {
-    window.location.href = `/api/library/${id}/export`;
+    // Append token as query param for authenticated download
+    window.location.href = `/api/library/${id}/export?token=${encodeURIComponent(authToken || '')}`;
   }
 
   async function handleDeleteTrack(id) {
@@ -590,7 +838,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const response = await fetch(`/api/library/${id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/library/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
       if (response.ok) {
         await loadLibrary();
       }
@@ -744,5 +995,5 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================================================
   // INITIALIZATION
   // ==========================================================================
-  loadLibrary(); // Load badge count on startup
+  initAuth(); // Check token and show modal if needed
 });

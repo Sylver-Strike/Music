@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const NodeID3 = require('node-id3');
 const { spawn } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
+const bcrypt = require('bcryptjs');
 
 // Paths to bundled binaries
 const isWin = process.platform === 'win32';
@@ -25,7 +26,7 @@ const PORT = process.env.PORT || 4000;
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+  res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type,authorization');
   res.setHeader('Access-Control-Allow-Credentials', true);
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
@@ -36,8 +37,10 @@ app.use((req, res, next) => {
 // Directories
 const PUBLIC_DIR = process.env.PUBLIC_DIR || path.join(__dirname, 'public');
 const CACHE_DIR = process.env.CACHE_DIR || path.join(__dirname, 'temp_cache');
-let LIBRARY_DIR = process.env.LIBRARY_DIR || path.join(__dirname, 'library');
-let LIBRARY_DB = process.env.LIBRARY_DB || path.join(__dirname, 'library.json');
+const BASE_LIBRARY_DIR = process.env.LIBRARY_DIR || path.join(__dirname, 'library');
+
+// Users database file
+const USERS_DB = path.join(__dirname, 'users.json');
 
 // Ensure directories exist
 try {
@@ -55,29 +58,16 @@ try {
 }
 
 try {
-  if (!fs.existsSync(LIBRARY_DIR)) fs.mkdirSync(LIBRARY_DIR, { recursive: true });
+  if (!fs.existsSync(BASE_LIBRARY_DIR)) fs.mkdirSync(BASE_LIBRARY_DIR, { recursive: true });
 } catch (err) {
-  console.error(`[Warning] Failed to create LIBRARY_DIR at ${LIBRARY_DIR}: ${err.message}. Falling back to local library folder.`);
-  LIBRARY_DIR = path.join(__dirname, 'library');
-  LIBRARY_DB = path.join(__dirname, 'library.json');
-  try {
-    if (!fs.existsSync(LIBRARY_DIR)) fs.mkdirSync(LIBRARY_DIR, { recursive: true });
-  } catch (innerErr) {
-    console.error(`[FATAL] Could not create fallback LIBRARY_DIR: ${innerErr.message}`);
-  }
+  console.error(`[Warning] Failed to create BASE_LIBRARY_DIR: ${err.message}`);
 }
 
-// Initialize library.json if missing
+// Initialize users.json if missing
 try {
-  if (!fs.existsSync(LIBRARY_DB)) fs.writeFileSync(LIBRARY_DB, '[]', 'utf-8');
+  if (!fs.existsSync(USERS_DB)) fs.writeFileSync(USERS_DB, '[]', 'utf-8');
 } catch (err) {
-  console.error(`[Warning] Failed to initialize LIBRARY_DB at ${LIBRARY_DB}: ${err.message}. Falling back to local library database.`);
-  LIBRARY_DB = path.join(__dirname, 'library.json');
-  try {
-    if (!fs.existsSync(LIBRARY_DB)) fs.writeFileSync(LIBRARY_DB, '[]', 'utf-8');
-  } catch (innerErr) {
-    console.error(`[FATAL] Could not initialize fallback LIBRARY_DB: ${innerErr.message}`);
-  }
+  console.error(`[Warning] Failed to initialize USERS_DB: ${err.message}`);
 }
 
 // Base64 Cookies decoding support (free workaround for Render)
@@ -101,6 +91,9 @@ app.use(express.static(PUBLIC_DIR));
 // Memory store for job statuses
 const jobs = new Map();
 const jobQueue = [];
+
+// In-memory session store: token -> { username, createdAt }
+const sessions = new Map();
 
 // Verify yt-dlp binary exists
 if (isWin) {
@@ -165,46 +158,92 @@ function sanitizeInput(str) {
 }
 
 // ----------------------------------------------------
-// LIBRARY PERSISTENCE HELPERS
+// USER / AUTH HELPERS
 // ----------------------------------------------------
-function readLibrary() {
+function readUsers() {
   try {
-    const raw = fs.readFileSync(LIBRARY_DB, 'utf-8');
+    const raw = fs.readFileSync(USERS_DB, 'utf-8');
     return JSON.parse(raw);
   } catch (e) {
-    console.error('[Library] Failed to read library.json:', e.message);
     return [];
   }
 }
 
-function writeLibrary(data) {
+function writeUsers(users) {
+  fs.writeFileSync(USERS_DB, JSON.stringify(users, null, 2), 'utf-8');
+}
+
+function getUserLibraryDir(username) {
+  const dir = path.join(BASE_LIBRARY_DIR, username);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function getUserLibraryDB(username) {
+  const dbPath = path.join(getUserLibraryDir(username), 'library.json');
+  if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '[]', 'utf-8');
+  return dbPath;
+}
+
+// Session token extraction middleware
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'] || '';
+  // Also accept token from query param (needed for audio/video streaming where
+  // the browser's <audio> element cannot set custom Authorization headers)
+  const token = (authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null)
+    || req.query.token
+    || null;
+  if (!token || !sessions.has(token)) {
+    return res.status(401).json({ error: 'Unauthorized. Please log in.' });
+  }
+  req.session = sessions.get(token);
+  req.username = req.session.username;
+  next();
+}
+
+// ----------------------------------------------------
+// LIBRARY PERSISTENCE HELPERS (per-user)
+// ----------------------------------------------------
+function readLibrary(username) {
   try {
-    fs.writeFileSync(LIBRARY_DB, JSON.stringify(data, null, 2), 'utf-8');
+    const dbPath = getUserLibraryDB(username);
+    const raw = fs.readFileSync(dbPath, 'utf-8');
+    return JSON.parse(raw);
   } catch (e) {
-    console.error('[Library] Failed to write library.json:', e.message);
+    console.error('[Library] Failed to read library:', e.message);
+    return [];
   }
 }
 
-function addToLibrary(track) {
-  const lib = readLibrary();
+function writeLibrary(username, data) {
+  try {
+    const dbPath = getUserLibraryDB(username);
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('[Library] Failed to write library:', e.message);
+  }
+}
+
+function addToLibrary(username, track) {
+  const lib = readLibrary(username);
   // Avoid duplicates by URL + quality
   const exists = lib.find(t => t.sourceUrl === track.sourceUrl && t.quality === track.quality && t.type === track.type);
   if (exists) {
-    console.log(`[Library] Track already exists: "${track.title}" [${track.quality}]`);
+    console.log(`[Library:${username}] Track already exists: "${track.title}" [${track.quality}]`);
     return exists;
   }
   lib.push(track);
-  writeLibrary(lib);
-  console.log(`[Library] Added: "${track.title}" [${track.quality}]`);
+  writeLibrary(username, lib);
+  console.log(`[Library:${username}] Added: "${track.title}" [${track.quality}]`);
   return track;
 }
 
-function removeFromLibrary(id) {
-  let lib = readLibrary();
+function removeFromLibrary(username, id) {
+  let lib = readLibrary(username);
   const track = lib.find(t => t.id === id);
   if (!track) return null;
   lib = lib.filter(t => t.id !== id);
-  writeLibrary(lib);
+  writeLibrary(username, lib);
   return track;
 }
 
@@ -224,7 +263,7 @@ async function extractMetadata(urlStr) {
     let source = parsedUrl.hostname.replace('www.', '');
 
     // YouTube specific fast parsing
-    const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/||user\/(?:[^\/]+)\/|shorts\/)|youtu\.be\/)([^"&?\/ ]{11})/;
+    const ytRegex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|user\/(?:[^\/]+)\/|shorts\/)|youtu\.be\/)([^"&?\/ ]{11})/;
     const ytMatch = urlStr.match(ytRegex);
     if (ytMatch && ytMatch[1]) {
       const videoId = ytMatch[1];
@@ -288,6 +327,88 @@ async function extractMetadata(urlStr) {
 }
 
 // ----------------------------------------------------
+// AUTH ROUTES
+// ----------------------------------------------------
+
+// Register
+app.post('/api/auth/register', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || typeof username !== 'string' || username.trim().length < 2) {
+    return res.status(400).json({ error: 'Username must be at least 2 characters.' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters.' });
+  }
+
+  // Sanitize username: only alphanumeric + underscores
+  const sanitizedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+  if (sanitizedUsername.length < 2) {
+    return res.status(400).json({ error: 'Username may only contain letters, numbers, and underscores.' });
+  }
+
+  const users = readUsers();
+  if (users.find(u => u.username === sanitizedUsername)) {
+    return res.status(409).json({ error: 'Username already taken. Please choose another.' });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  users.push({ username: sanitizedUsername, passwordHash, createdAt: Date.now() });
+  writeUsers(users);
+
+  // Auto-create their library dir
+  getUserLibraryDir(sanitizedUsername);
+
+  // Issue token
+  const token = uuidv4();
+  sessions.set(token, { username: sanitizedUsername, createdAt: Date.now() });
+
+  console.log(`[Auth] Registered new user: ${sanitizedUsername}`);
+  res.status(201).json({ token, username: sanitizedUsername });
+});
+
+// Login
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required.' });
+  }
+
+  const sanitizedUsername = username.trim().toLowerCase();
+  const users = readUsers();
+  const user = users.find(u => u.username === sanitizedUsername);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid username or password.' });
+  }
+
+  const match = await bcrypt.compare(password, user.passwordHash);
+  if (!match) {
+    return res.status(401).json({ error: 'Invalid username or password.' });
+  }
+
+  const token = uuidv4();
+  sessions.set(token, { username: sanitizedUsername, createdAt: Date.now() });
+
+  console.log(`[Auth] User logged in: ${sanitizedUsername}`);
+  res.json({ token, username: sanitizedUsername });
+});
+
+// Logout
+app.post('/api/auth/logout', authMiddleware, (req, res) => {
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.slice(7);
+  sessions.delete(token);
+  console.log(`[Auth] User logged out: ${req.username}`);
+  res.json({ success: true });
+});
+
+// Get current user
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+  res.json({ username: req.username });
+});
+
+// ----------------------------------------------------
 // API ROUTES
 // ----------------------------------------------------
 
@@ -313,8 +434,8 @@ app.post('/api/fetch-metadata', async (req, res) => {
   }
 });
 
-// FR-03 & FR-04: Audio Extraction & Job Creation
-app.post('/api/convert', (req, res) => {
+// FR-03 & FR-04: Audio Extraction & Job Creation (requires auth)
+app.post('/api/convert', authMiddleware, (req, res) => {
   const { url, quality, title, thumbnail, duration, source, type } = req.body;
   
   const isVideo = type === 'video';
@@ -337,6 +458,7 @@ app.post('/api/convert', (req, res) => {
   const jobId = uuidv4();
   const job = {
     id: jobId,
+    userId: req.username,  // <-- scoped to this user
     url,
     type: isVideo ? 'video' : 'audio',
     quality: quality || '192kbps',
@@ -590,13 +712,13 @@ app.get('/api/debug-cookies', (req, res) => {
 
 
 // ----------------------------------------------------
-// LIBRARY API ENDPOINTS
+// LIBRARY API ENDPOINTS (all require auth)
 // ----------------------------------------------------
 
-// List all tracks in library
-app.get('/api/library', (req, res) => {
+// List all tracks in user's library
+app.get('/api/library', authMiddleware, (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  const lib = readLibrary();
+  const lib = readLibrary(req.username);
   // Calculate total storage
   let totalSize = 0;
   lib.forEach(t => { totalSize += (t.fileSize || 0); });
@@ -604,17 +726,17 @@ app.get('/api/library', (req, res) => {
 });
 
 // Stream a library track for in-app playback (supports Range for seeking)
-app.get('/api/library/:id/stream', (req, res) => {
+app.get('/api/library/:id/stream', authMiddleware, (req, res) => {
   const { id } = req.params;
-  const lib = readLibrary();
+  const lib = readLibrary(req.username);
   const track = lib.find(t => t.id === id);
 
   if (!track) return res.status(404).json({ error: 'Track not found in library.' });
 
-  const filePath = path.join(LIBRARY_DIR, track.filename);
+  const filePath = path.join(getUserLibraryDir(req.username), track.filename);
   if (!fs.existsSync(filePath)) {
     // File missing on disk — remove from library db
-    removeFromLibrary(id);
+    removeFromLibrary(req.username, id);
     return res.status(404).json({ error: 'Audio file missing from disk. Removed from library.' });
   }
 
@@ -659,16 +781,16 @@ app.get('/api/library/:id/stream', (req, res) => {
 });
 
 // Export / download a library track to PC
-app.get('/api/library/:id/export', (req, res) => {
+app.get('/api/library/:id/export', authMiddleware, (req, res) => {
   const { id } = req.params;
-  const lib = readLibrary();
+  const lib = readLibrary(req.username);
   const track = lib.find(t => t.id === id);
 
   if (!track) return res.status(404).json({ error: 'Track not found.' });
 
-  const filePath = path.join(LIBRARY_DIR, track.filename);
+  const filePath = path.join(getUserLibraryDir(req.username), track.filename);
   if (!fs.existsSync(filePath)) {
-    removeFromLibrary(id);
+    removeFromLibrary(req.username, id);
     return res.status(404).json({ error: 'File missing from disk.' });
   }
 
@@ -687,17 +809,17 @@ app.get('/api/library/:id/export', (req, res) => {
 });
 
 // Delete a track from library
-app.delete('/api/library/:id', (req, res) => {
+app.delete('/api/library/:id', authMiddleware, (req, res) => {
   const { id } = req.params;
-  const track = removeFromLibrary(id);
+  const track = removeFromLibrary(req.username, id);
 
   if (!track) return res.status(404).json({ error: 'Track not found in library.' });
 
   // Delete file from disk
-  const filePath = path.join(LIBRARY_DIR, track.filename);
+  const filePath = path.join(getUserLibraryDir(req.username), track.filename);
   try {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    console.log(`[Library] Deleted: "${track.title}"`);
+    console.log(`[Library:${req.username}] Deleted: "${track.title}"`);
   } catch (e) {
     console.error(`[Library] Failed to delete file for ${id}:`, e.message);
   }
@@ -883,11 +1005,13 @@ async function processJob(job) {
           let finalPath = outputPath;
           if (job.type === 'audio') {
             try {
+              // Save to user's personal library directory
+              const userLibDir = getUserLibraryDir(job.userId);
               const libFilename = `${job.id}.mp3`;
-              const libPath = path.join(LIBRARY_DIR, libFilename);
+              const libPath = path.join(userLibDir, libFilename);
               fs.copyFileSync(outputPath, libPath);
               const fileSize = fs.statSync(libPath).size;
-              addToLibrary({
+              addToLibrary(job.userId, {
                 id: job.id,
                 title: job.title,
                 source: job.source,
@@ -902,7 +1026,7 @@ async function processJob(job) {
               });
               fs.unlinkSync(outputPath);
               finalPath = libPath;
-              console.log(`[Library] Track automatically saved to library: "${job.title}"`);
+              console.log(`[Library:${job.userId}] Track automatically saved to library: "${job.title}"`);
             } catch (libErr) {
               console.error(`[Library] Failed to automatically save to library for job ${job.id}:`, libErr.message);
             }
@@ -994,5 +1118,6 @@ app.listen(PORT, () => {
   console.log(`SonicFetch Backend listening on http://localhost:${PORT}`);
   console.log(`Serving static UI files from ${PUBLIC_DIR}`);
   console.log(`Audio Cache directory configured at ${CACHE_DIR}`);
+  console.log(`Per-user libraries stored under ${BASE_LIBRARY_DIR}/<username>/`);
   console.log(`=======================================================`);
 });

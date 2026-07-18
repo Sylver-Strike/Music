@@ -66,9 +66,19 @@
         </button>
       </div>
 
-      <!-- Sidebar Footer -->
+      <!-- Sidebar Footer / User Info -->
       <div class="sidebar-footer">
-        <p>&copy; 2026 SonicFetch</p>
+        <div class="sidebar-user" id="sidebar-user">
+          <div class="sidebar-user-avatar" id="sidebar-user-avatar">?</div>
+          <div class="sidebar-user-info">
+            <span class="sidebar-username" id="sidebar-username">Not logged in</span>
+            <span class="sidebar-user-label">Logged in</span>
+          </div>
+          <button class="sidebar-logout-btn" id="sidebar-logout-btn" title="Log out">
+            <i data-lucide="log-out" class="sidebar-logout-icon"></i>
+          </button>
+        </div>
+        <p class="sidebar-copyright">&copy; 2026 SonicFetch</p>
       </div>
     </aside>
 
@@ -387,6 +397,71 @@
     <audio id="audio-element" preload="auto"></audio>
 
   </div><!-- /app-shell -->
+
+  <!-- ===== AUTH MODAL ===== -->
+  <div class="auth-modal-overlay" id="auth-modal-overlay">
+    <div class="auth-modal glass-panel" id="auth-modal">
+      <!-- Logo -->
+      <div class="auth-modal-logo">
+        <div class="logo-icon-bg">
+          <i data-lucide="music-4" class="logo-icon"></i>
+        </div>
+        <h1 class="logo-text">Sonic<span>Fetch</span></h1>
+      </div>
+
+      <p class="auth-modal-subtitle">Your personal music library awaits.</p>
+
+      <!-- Tab Switcher -->
+      <div class="auth-tabs" id="auth-tabs">
+        <button class="auth-tab active" id="tab-login" data-tab="login">Sign In</button>
+        <button class="auth-tab" id="tab-register" data-tab="register">Create Account</button>
+      </div>
+
+      <!-- Login Form -->
+      <form class="auth-form" id="auth-form-login">
+        <div class="auth-input-group">
+          <i data-lucide="user" class="auth-input-icon"></i>
+          <input type="text" id="login-username" class="auth-input" placeholder="Username" autocomplete="username" required>
+        </div>
+        <div class="auth-input-group">
+          <i data-lucide="lock" class="auth-input-icon"></i>
+          <input type="password" id="login-password" class="auth-input" placeholder="Password" autocomplete="current-password" required>
+        </div>
+        <div class="auth-error hidden" id="login-error">
+          <i data-lucide="alert-circle" class="auth-error-icon"></i>
+          <span id="login-error-msg"></span>
+        </div>
+        <button type="submit" class="primary-btn auth-submit-btn" id="login-submit-btn">
+          <span>Sign In</span>
+          <i data-lucide="arrow-right" class="btn-icon"></i>
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form class="auth-form hidden" id="auth-form-register">
+        <div class="auth-input-group">
+          <i data-lucide="user" class="auth-input-icon"></i>
+          <input type="text" id="register-username" class="auth-input" placeholder="Username (letters, numbers, _)" autocomplete="username" required>
+        </div>
+        <div class="auth-input-group">
+          <i data-lucide="lock" class="auth-input-icon"></i>
+          <input type="password" id="register-password" class="auth-input" placeholder="Password (min 4 chars)" autocomplete="new-password" required>
+        </div>
+        <div class="auth-input-group">
+          <i data-lucide="lock" class="auth-input-icon"></i>
+          <input type="password" id="register-confirm" class="auth-input" placeholder="Confirm Password" autocomplete="new-password" required>
+        </div>
+        <div class="auth-error hidden" id="register-error">
+          <i data-lucide="alert-circle" class="auth-error-icon"></i>
+          <span id="register-error-msg"></span>
+        </div>
+        <button type="submit" class="primary-btn auth-submit-btn" id="register-submit-btn">
+          <span>Create Account</span>
+          <i data-lucide="arrow-right" class="btn-icon"></i>
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- Main JavaScript File -->
   <script src="js/app.js"></script>

@@ -9,6 +9,7 @@ bin/
 # Local database / downloaded music files
 library/
 library.json
+users.json
 
 # IDE settings directories
 .idea/
